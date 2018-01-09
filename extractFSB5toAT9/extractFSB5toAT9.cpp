@@ -21,9 +21,13 @@ along with this program.  If not, see <http://www.gnu.org/licenses/>.
 #include <iostream>
 #include <fstream>
 #include <inttypes.h>
-#include <string>
+//#include <string>
+//#include <string.h>
+//#include "FSB5struct.h"
 
-#define VERSION "Rev0-1"
+#define VERSION "Rev0-2"
+//0-1	initial draft
+//0-2	removed most debug printf stuff and added blockAlign and avgBytesPerSec corrections (anything extracted with this tool before this change probably has audio issues or diminished quality)
 
 #pragma pack(1)	//bytewise
 struct ATRAC9_HEADER {
@@ -100,6 +104,17 @@ struct FSB5_SAMPLE_CHUNK_DEF {
 	std::uint32_t	chunkType : 7;	//chunk type 3=loop, 9=ATRAC9, etc. only caring about ATRAC9 for this
 };
 
+struct FSB5_SAMPLE_CHANNELS_CHUNK {
+	//chunk type 1
+	std::uint8_t	channels;
+};
+
+struct FSB5_SAMPLE_LOOP_CHUNK {
+	//chunk type 3
+	std::uint32_t	loopStart;
+	std::uint32_t	loopEnd;
+};
+
 struct FSB5_SAMPLE_ATRAC9_CHUNK {
 	//chunk type 9
 	std::uint32_t	unknownByte;	//there's a byte at the beginning of this chunk that might be important but is currently unknown, probably a bitfield that has the info for blockAlign/other things
@@ -131,6 +146,8 @@ int main(int argc, char *argv[]) {
 	FSB5_HEADER	fsbHeader;
 	FSB5_SAMPLE_HEADER fsbSampleHeader, nextSampleHeader;	//each file's header info
 	FSB5_SAMPLE_CHUNK_DEF fsbSampleChunk;	//if extraParams != 0
+	FSB5_SAMPLE_CHANNELS_CHUNK fsbChannelsChunk;
+	FSB5_SAMPLE_LOOP_CHUNK fsbLoopChunk;
 	FSB5_SAMPLE_ATRAC9_CHUNK fsbAt9Chunk;	//important chunk that will dictate ATRAC9 header info
 
 											//variables
@@ -159,27 +176,71 @@ int main(int argc, char *argv[]) {
 										//read FSB5 main header (done once)
 	inputFile.read((char *)&fsbHeader, sizeof(fsbHeader));
 
-	std::printf("FSB5 ID\t%.*s\n", sizeof(fsbHeader.FSB5_ID), fsbHeader.FSB5_ID);	//string of char [4] (print size/ptr because non null terminated)
-	std::printf("Sub Version\t0x%08X\t%d\n", fsbHeader.FSB5_version, fsbHeader.FSB5_version);
-	std::printf("numSamples\t0x%08X\t%d\n", fsbHeader.numSamples, fsbHeader.numSamples);
+	/*	don't print the header info for now
+	std::printf(
+		"ID" "\t"
+		"subVersion" "\t"
+		"numSamples" "\t"
+		"headerSize" "\t"
+		"namesSize " "\t"
+		"dataSize  " "\t"
+		"FSBmode" "\t"
+		"unknown01         " "\t"
+		"unknown02 (Hash?)                 " "\t"
+		"unknown03         " "\n"
+	);
+	*/
+
+	//std::printf("%.*s\t", sizeof(fsbHeader.FSB5_ID), fsbHeader.FSB5_ID);	//string of char [4] (print size/ptr because non null terminated)
+	//std::printf("0x%08X\t", fsbHeader.FSB5_version);
+	//std::printf("0x%08X\t", fsbHeader.numSamples);
 	sampleTableStart = 0x3C;	//not actually important
-	std::printf("sampleHeaderSize\t0x%08X\t%d\n", fsbHeader.sampleHeaderSize, fsbHeader.sampleHeaderSize);
+	//std::printf("0x%08X\t", fsbHeader.sampleHeaderSize);
 	nameTableStart = sampleTableStart + fsbHeader.sampleHeaderSize;	//name table starts after FSBheader + sampleHeader
 	nameTableCurrent = nameTableStart;	//initial position in name table
-	std::printf("nameTableSize\t0x%08X\t%d\n", fsbHeader.nameTableSize, fsbHeader.nameTableSize);
+	//std::printf("0x%08X\t", fsbHeader.nameTableSize);
 	dataTableStart = nameTableStart + fsbHeader.nameTableSize;
 	dataTableCurrent = dataTableStart;	//initial position in the data table
-	std::printf("dataSize\t0x%08X\t%d\n", fsbHeader.dataSize, fsbHeader.dataSize);
+	//std::printf("0x%08X\t", fsbHeader.dataSize);
 	dataTableEnd = dataTableStart + fsbHeader.dataSize;	//should probably verify that this = EOF
-	std::printf("mode\t0x%08X\t%d\n", fsbHeader.mode, fsbHeader.mode);	//it's AT9 mode for the files we care about
-	std::printf("unknown01\t0x");
-	for (std::uint8_t i = 0; i < sizeof(fsbHeader.unknown01); i++) { std::printf("%02X", fsbHeader.unknown01[i]); } std::printf("\n");
-	std::printf("unknown02\t0x");
-	for (std::uint8_t i = 0; i < sizeof(fsbHeader.unknown02); i++) { std::printf("%02X", fsbHeader.unknown02[i]); } std::printf("\n");
-	std::printf("unknown03\t0x");
-	for (std::uint8_t i = 0; i < sizeof(fsbHeader.unknown03); i++) { std::printf("%02X", fsbHeader.unknown03[i]); } std::printf("\n");
-	std::printf("\n");
 
+	//std::printf("0x%08X\t", fsbHeader.mode);	//it's AT9 mode for the files we care about
+	/*
+	switch (fsbHeader.mode)
+	{
+	case 0x02:
+		std::printf("PCM16  \t");
+		break;
+	case 0x0B:
+		std::printf("MPEG   \t");
+		break;
+	case 0x0D:
+		std::printf("AT9    \t");
+		break;
+	case 0x0F:
+		std::printf("VORBIS \t");
+		break;
+	default:
+		std::printf("UNKNOWN\t");
+		break;
+	}
+	*/
+	//catches most errors if wrong mode or not FSB5
+	if (fsbHeader.mode != 0x0D)
+	{
+		std::printf("ERROR: FSB mode not supported - 0x%08X\n", fsbHeader.mode);
+		return 1;
+	}
+
+	//std::printf("0x");
+	//for (std::uint8_t i = 0; i < sizeof(fsbHeader.unknown01); i++) { std::printf("%02X", fsbHeader.unknown01[i]); } std::printf("\t");
+	//std::printf("0x");
+	//for (std::uint8_t i = 0; i < sizeof(fsbHeader.unknown02); i++) { std::printf("%02X", fsbHeader.unknown02[i]); } std::printf("\t");
+	//std::printf("0x");
+	//for (std::uint8_t i = 0; i < sizeof(fsbHeader.unknown03); i++) { std::printf("%02X", fsbHeader.unknown03[i]); } std::printf("\n");
+	//std::printf("\n");
+
+	/*
 	std::printf(
 		"no." "\t"
 		"xtra" "\t"
@@ -189,9 +250,11 @@ int main(int argc, char *argv[]) {
 		"#samp" "\t"
 		"chnks" "\t"
 		"filename" "\t"
-		"dataBegin" "\t"
+		//"dataBegin" "\t"
+		//add loop info
 		"dataSize" "\n"
 	);
+	*/
 
 
 	for (size_t sampleNumber = 0; sampleNumber < fsbHeader.numSamples; sampleNumber++)
@@ -238,13 +301,19 @@ int main(int argc, char *argv[]) {
 				switch (fsbSampleChunk.chunkType)	//do something based on the chunk type
 				{
 				case 1:	//channels chunk
-					inputFile.read((char *)&tempChannels, sizeof(tempChannels));	//if there's a channels chunk, read it and store the #
+					inputFile.read((char *)&fsbChannelsChunk, sizeof(fsbChannelsChunk));
+					tempChannels = fsbChannelsChunk.channels;
+					//inputFile.read((char *)&tempChannels, sizeof(tempChannels));	//if there's a channels chunk, read it and store the #
 																					//only used for files with >2 channels
 					break;
 				case 3:	//loop chunk
-					inputFile.seekg(fsbSampleChunk.size, std::ios::cur);	//skip for now
+					inputFile.read((char *)&fsbLoopChunk, sizeof(fsbLoopChunk));
+					//inputFile.seekg(fsbSampleChunk.size, std::ios::cur);	//skip for now
 																			//could add loop info to the ATRAC9 header
 					break;
+				case 5:	//unknown chunk
+					inputFile.seekg(fsbSampleChunk.size, std::ios::cur);	//skip for now
+					//need to reverse engineer FMOD output to determine the purpose and structure of this chunk
 				case 9: //ATRAC9 chunk
 					inputFile.read((char *)&fsbAt9Chunk, sizeof(fsbAt9Chunk));	//read the ATRAC9 config data
 					break;
@@ -263,28 +332,12 @@ int main(int argc, char *argv[]) {
 		inputFile.read((char *)&nameTableTextOffset, sizeof(nameTableTextOffset));	//read the offset from the nametable offset list
 		nameTableCurrent = inputFile.tellg();	//remember where the next name offset is for next time
 		inputFile.seekg(nameTableTextOffset + nameTableStart);	//go to the actual filename location, which is at nameTableStart + whatever offset
-																//read until null encountered. this is a dumb way to do this but it worked...
+
 		tempString.clear();
-		/*
-		while (tempChar != 0x00)
-		{
-		inputFile.read((char *)&tempChar, sizeof(tempChar));
-		if (tempChar == 0x00)
-		{
-		tempString += ".at9\0";
-		break;	//don't add the null
-		}
-		tempString += tempChar;
-		}
-		//tempString += ".at9\0";
-		tempChar = 0xFF;
-		*/
 		inputFile.getline(stringBuffer, sizeof(stringBuffer), '\0');
 		tempString = stringBuffer;
 		tempString += ".at9\0";
 
-		//std::printf("\t");
-		//std::printf("%s\t", stringBuffer);
 		std::printf("%s\t", tempString.c_str());	//this should be the filename
 
 		std::ofstream outputFile(tempString, std::ios::binary);		//create the output file and open file as binary
@@ -309,8 +362,34 @@ int main(int argc, char *argv[]) {
 		outputHeader.RIFF_Chunk_Data_Size = 0x58 + dataEntrySize;	//ATRAC9 could have extra chunks but this program doesn't add them in
 		outputHeader.nChannels = tempChannels;
 		outputHeader.nSamplesPerSec = 48000;	//need to add code to interpret fsbSampleHeader.frequency, but '9' = 48000Hz and almost all the files appear the same for Bloodborne
-		outputHeader.nAvgBytesPerSec = 9000;	//should calculate this instead, but at9tool will still extract audio with incorrect value
-		outputHeader.nBlockAlign = 48;	//should calculate this instead, but at9tool will still extract audio with incorrect value (may be in FSB ATRAC9 chunk's first half)
+
+		//channels defaults:
+		//#ch	kbps	bytes/s	blockalign
+		//1ch	72  	9000	192
+		//2ch	144 	18000	384
+		//4ch	240 	30000	640
+		//outputHeader.nAvgBytesPerSec = 18000;	//should calculate this instead, but at9tool will still extract audio with incorrect value
+		//outputHeader.nBlockAlign = 384;	//should calculate this instead, but at9tool will still extract audio with incorrect value (may be in FSB ATRAC9 chunk's first half)
+		switch (outputHeader.nChannels)
+		{
+		case 1:
+			outputHeader.nAvgBytesPerSec = 9000;
+			outputHeader.nBlockAlign = 192;
+			break;
+		case 2:
+			outputHeader.nAvgBytesPerSec = 18000;
+			outputHeader.nBlockAlign = 384;
+			break;
+		case 4:
+			outputHeader.nAvgBytesPerSec = 30000;
+			outputHeader.nBlockAlign = 640;
+			break;
+		default:
+			outputHeader.nAvgBytesPerSec = 9000;
+			outputHeader.nBlockAlign = 192;
+			break;
+		}
+
 		//config
 		outputHeader.atrac9_id = fsbAt9Chunk.atrac9_id;
 		outputHeader.reserved1 = fsbAt9Chunk.reserved1;
@@ -323,13 +402,16 @@ int main(int argc, char *argv[]) {
 		//fact
 		outputHeader.Total_Samples = fsbSampleHeader.samples;
 		outputHeader.data_Chunk_Data_Size = dataEntrySize;
+		//could also write loop data here, based on WAVE RIFF "smpl" chunk structure
+		//http://www-mmsp.ece.mcgill.ca/Documents/AudioFormats/WAVE/Docs/RIFFNEW.pdf
 
 		outputFile.write((char *)&outputHeader, sizeof(outputHeader));	//write the ATRAC9 header
 
 		inputFile.seekg(dataTableCurrent);	//go to where the data starts
 											//read data starting here, total size of dataEntrySize
 
-		std::printf("0x%08X\t", dataTableCurrent);
+		//std::printf("0x%08X\t", dataTableCurrent);
+		//should print loop info (start/end)
 		std::printf("0x%08X\t", dataEntrySize);
 		std::printf("\n");
 
@@ -342,10 +424,12 @@ int main(int argc, char *argv[]) {
 		outputFile.write((char *)&tempByte, sizeof(tempByte));
 		}
 		
+		
 
 		outputFile.close();
 		//then move onto the next sample and repeat the process numSamples times total 
 		inputFile.seekg(sampleTableCurrent);
+		
 	}
 
 
