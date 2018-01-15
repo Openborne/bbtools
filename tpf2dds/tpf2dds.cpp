@@ -1,5 +1,4 @@
 #include <vector>
-#include <iterator>
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
@@ -15,7 +14,7 @@ enum {
 
 struct Tpf {
 	template<typename T>
-	static T getu(ifstream& in)
+	T getu(ifstream& in)
 	{
 		T res;
 		char tmp[sizeof(T)];
@@ -29,7 +28,7 @@ struct Tpf {
 	}
 
 	template<typename T>
-	static void putu(ofstream& out, T c)
+	void putu(ofstream& out, T c)
 	{
 		for (T i = 0; i < sizeof(T); i++)
 			out.put(c >> (i * 8) & 0xff);
@@ -37,9 +36,10 @@ struct Tpf {
 
 	string gets(ifstream& in, unsigned n)
 	{
-		char buf[n];
+		char *buf = new char[n];
 		in.read(buf, n);
 		string res(buf);
+		delete []buf;
 		return res;
 	}
 
@@ -194,7 +194,7 @@ int Tpf::convert(ifstream& in, string path)
 
 int main(int argc, char *argv[])
 {
-	const std::string errtab[] = {
+	const string errtab[] = {
 		"bad file format",
 		"could not open path"
 	};

@@ -1,4 +1,4 @@
-CFLAGS := -Wall -Wextra -O3
+CFLAGS := -Wall -Wextra -pedantic -O3
 TARGET := tpf2dds
 SRC := tpf2dds.cpp
 CC := c++
