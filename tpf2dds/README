@@ -1,0 +1,16 @@
+tpf2dds - DSIII/Bloodborne TPF to DDS conversion utility
+
+This utility has been converted from C# Bytecode into C++ code, the
+convert function at this point is extremely messy.
+
+To compile and install, simply type in:
+
+make
+make install
+
+You can use tpf2dds like so:
+
+tpf2dds file.tpf dir
+
+and the program will output DDS files into the directory `dir` from file
+`file.tpf`. Make sure you have created the directory beforehand.
