@@ -217,6 +217,7 @@ int main(int argc, char *argv[])
 
 	if ((res = t.convert(in, argv[2])) < 0) {
 		cerr << progname << ": " << errtab[-res-1] << endl;
+		in.close();
 		return EXIT_FAILURE;
 	}
 
