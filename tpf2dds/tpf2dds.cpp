@@ -2,6 +2,8 @@
 #include <iostream>
 #include <fstream>
 #include <cstdlib>
+#include <codecvt>
+#include <locale>
 #include <ios>
 
 #define Progname "tpf2dds"
@@ -45,18 +47,13 @@ struct Tpf {
 
 	string gets(ifstream& in)
 	{
-		int state;
-		unsigned char c;
+		char16_t c;
 		string res;
-		for (state = Out;;) {
-			c = getu<unsigned char>(in);
-			if (state == Out && c == '\0') {
-				state = In;
-				continue;
-			} else if (c == '\0')
-				break;
-			res += c;
-			state = Out;
+
+		while ((c = getu<char16_t>(in)) != 0x0000) {
+			wstring_convert<codecvt_utf8<char32_t>,
+					char32_t> w32;
+			res += w32.to_bytes(c);
 		}
 		return res;
 	}
