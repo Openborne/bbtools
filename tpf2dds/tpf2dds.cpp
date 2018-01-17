@@ -10,10 +10,6 @@
 
 using namespace std;
 
-enum {
-	In, Out
-};
-
 struct Tpf {
 	template<typename T>
 	T getu(ifstream& in)
