@@ -1,0 +1,16 @@
+unparam - Extract param field info
+
+This utility will extract param field info by reading in the appropriate
+fields from the paramdef (parameter definition/header) with the associated
+param file.
+
+To compile and install, simply type in:
+
+make
+make install
+
+You can use unparam like so:
+
+unparam <paramdef> <param>
+
+and it will print the parameter data to standard output in CSV format.
