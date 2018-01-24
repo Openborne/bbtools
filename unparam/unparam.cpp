@@ -293,7 +293,7 @@ struct Param {
 					break;
 				}
 
-				if (tc.ref == "dummmy8")
+				if (tc.ref == "dummy8")
 					Bit::unpack(in, Bit::Skip(1));
 				e.field.push_back(tc);
 			}
