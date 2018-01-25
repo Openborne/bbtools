@@ -1,0 +1,16 @@
+undcx - Decompress DCX files
+
+undcx is a tool for decompressing DCX/DEFLATE files. You will
+need zlib to compile this tool.
+
+To compile and install, simply type in:
+
+make
+make install
+
+You can use undcx like so:
+
+undcx <infile>
+
+and it should print the decompressed data to stdout. It is preferable to
+redirect the output into a separate file.
