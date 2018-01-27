@@ -314,6 +314,7 @@ int main(int argc, char *argv[]) {
 				case 5:	//unknown chunk
 					inputFile.seekg(fsbSampleChunk.size, std::ios::cur);	//skip for now
 					//need to reverse engineer FMOD output to determine the purpose and structure of this chunk
+					break;
 				case 9: //ATRAC9 chunk
 					inputFile.read((char *)&fsbAt9Chunk, sizeof(fsbAt9Chunk));	//read the ATRAC9 config data
 					break;
